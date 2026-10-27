@@ -1,0 +1,86 @@
+name: Build EfuLogistix
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phone-apk:
+    name: Phone app (Android APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack the zip
+        run: if [ -f EfuLogistix_github.zip ]; then unzip -o -q EfuLogistix_github.zip; fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build APK
+        working-directory: phone
+        run: |
+          flutter create --org mw.efulogistix --project-name efulogistix_fleet --platforms android .
+          rm -f test/widget_test.dart
+          flutter pub get
+          dart run tool/add_permissions.dart
+          flutter analyze --no-fatal-infos --no-fatal-warnings || true
+          flutter build apk --release --split-per-abi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: efulogistix-phone-apk
+          path: phone/build/app/outputs/flutter-apk/*.apk
+
+  admin-web:
+    name: Admin panel (web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack the zip
+        run: if [ -f EfuLogistix_github.zip ]; then unzip -o -q EfuLogistix_github.zip; fi
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build web
+        working-directory: admin
+        run: |
+          flutter create --org mw.efulogistix --project-name efulogistix_admin --platforms web .
+          rm -f test/widget_test.dart
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings || true
+          flutter build web --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: efulogistix-admin-web
+          path: admin/build/web
+
+  admin-windows:
+    name: Admin panel (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack the zip
+        shell: pwsh
+        run: if (Test-Path EfuLogistix_github.zip) { Expand-Archive -Force EfuLogistix_github.zip . }
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build Windows app
+        working-directory: admin
+        run: |
+          flutter create --org mw.efulogistix --project-name efulogistix_admin --platforms windows .
+          flutter pub get
+          flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: efulogistix-admin-windows
+          path: admin/build/windows/x64/runner/Release/
